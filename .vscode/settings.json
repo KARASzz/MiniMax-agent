@@ -1,0 +1,12 @@
+{
+  "editor.fontFamily": "Monaspace Krypton Var, Consolas, monospace",
+  "editor.fontSize": 18,
+  "editor.fontLigatures": "'calt', 'liga', 'ss01', 'ss02', 'ss03', 'ss04', 'ss05', 'ss06', 'ss07'",
+  "editor.fontVariations": "'wght' 450",
+
+  // 以下为注入自定义 CSS，实现注释使用 Radon Var
+  "vscode_custom_css.imports": [
+    "file:///C:/Users/KARASz/.vscode/custom.css"
+  ],
+  "vscode_custom_css.policy": true
+}
