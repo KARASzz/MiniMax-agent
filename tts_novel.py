@@ -151,15 +151,15 @@ def split_novel(text):
         return split_by_length(text)
 
 
-def create_tts_task(text, voice_id, model):
+def create_tts_task(text, voice_id, model, speed=1.0, vol=5.0):
     """创建异步 TTS 任务"""
     payload = {
         "model": model,
         "text": text,
         "voice_setting": {
             "voice_id": voice_id,
-            "speed": 1.0,
-            "vol": 5.0,
+            "speed": speed,
+            "vol": vol,
             "pitch": 0,
         },
         "audio_setting": {
@@ -216,6 +216,14 @@ def run():
         speed = 1.0
     print(f"语速: {speed}")
 
+    vol_input = input("\n请输入音量 [0-10，默认 5.0]: ").strip()
+    try:
+        vol = float(vol_input)
+        vol = max(0.0, min(10.0, vol))
+    except (ValueError, TypeError):
+        vol = 5.0
+    print(f"音量: {vol}")
+
     # 拆分文本
     print("\n正在分析文本结构...")
     chunks = split_novel(text)
@@ -245,7 +253,7 @@ def run():
 
         try:
             # 创建任务
-            task_id, file_id = create_tts_task(chunk_text, voice_id, model)
+            task_id, file_id = create_tts_task(chunk_text, voice_id, model, speed=speed, vol=vol)
 
             # 轮询等待完成
             print("  等待合成完成...")

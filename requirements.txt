@@ -1,2 +1,6 @@
 anthropic
 httpx
+fastapi
+python-multipart
+uvicorn
+-e ./MiniMax-MCP

@@ -11,6 +11,14 @@ MiniMax 小工具 — 非交互式 CLI 入口
   python cli.py cover <音频路径或URL> "风格描述" [--lyrics "歌词"]
   python cli.py lyrics "提示词" [--title "标题"] [--mode edit] [--existing "已有歌词"]
   python cli.py tts <md文件路径> <voice_id> [--model speech-2.8-hd] [--speed 1.0]
+  python cli.py mcp-server
+  python cli.py speak "要朗读的文本" [--voice-id female-shaonv]
+  python cli.py voices [--type all]
+  python cli.py voice-design "温柔成熟的女性旁白音色" --preview "你好"
+  python cli.py voice-clone my_voice "demo.mp3" --text "你好"
+  python cli.py video "电影感城市夜景" [--async-mode]
+  python cli.py video-query <task_id>
+  python cli.py skills [技能名] [--install-info]
 """
 
 import argparse
@@ -271,7 +279,7 @@ def cmd_tts(args):
     saved_files = []
     for i, (label, chunk_text) in enumerate(chunks, 1):
         print(f"处理片段 [{i}/{len(chunks)}]: {label}", file=sys.stderr)
-        task_id, file_id = create_tts_task(chunk_text, args.voice_id, args.model)
+        task_id, file_id = create_tts_task(chunk_text, args.voice_id, args.model, speed=args.speed, vol=args.vol)
         status, result_file_id = poll_task(task_id)
         download_url = get_file_download_url(result_file_id)
         safe_label = "".join(c if c.isalnum() or c in " _-" else "_" for c in label)
@@ -283,6 +291,97 @@ def cmd_tts(args):
         "total_chunks": len(chunks),
         "saved_files": saved_files,
     }, ensure_ascii=False, indent=2))
+
+
+# ── official MiniMax MCP tools ─────────────────────────
+def cmd_mcp_server(args):
+    from minimax_mcp_bridge import run_mcp_server
+
+    run_mcp_server()
+
+
+def cmd_speak(args):
+    from mcp_tools import print_result, text_to_audio
+
+    print_result(text_to_audio(
+        text=args.text,
+        voice_id=args.voice_id,
+        model=args.model,
+        speed=args.speed,
+        vol=args.vol,
+        output_directory=args.output,
+    ))
+
+
+def cmd_voices(args):
+    from mcp_tools import list_voices, print_result
+
+    print_result(list_voices(args.type))
+
+
+def cmd_voice_design(args):
+    from mcp_tools import print_result, voice_design
+
+    print_result(voice_design(
+        prompt=args.prompt,
+        preview_text=args.preview,
+        voice_id=args.voice_id,
+        output_directory=args.output,
+    ))
+
+
+def cmd_voice_clone(args):
+    from mcp_tools import print_result, voice_clone
+
+    print_result(voice_clone(
+        voice_id=args.voice_id,
+        file=args.file,
+        text=args.text,
+        is_url=args.url or args.file.startswith(("http://", "https://")),
+        output_directory=args.output,
+    ))
+
+
+def cmd_video(args):
+    from mcp_tools import generate_video, print_result
+
+    print_result(generate_video(
+        prompt=args.prompt,
+        model=args.model,
+        first_frame_image=args.first_frame,
+        duration=args.duration,
+        resolution=args.resolution,
+        output_directory=args.output,
+        async_mode=args.async_mode,
+    ))
+
+
+def cmd_video_query(args):
+    from mcp_tools import print_result, query_video_generation
+
+    print_result(query_video_generation(args.task_id, output_directory=args.output))
+
+
+def cmd_play_audio(args):
+    from mcp_tools import play_audio, print_result
+
+    print_result(play_audio(
+        input_file_path=args.input,
+        is_url=args.url or args.input.startswith(("http://", "https://")),
+    ))
+
+
+def cmd_skills(args):
+    from skills_cli import print_detail, print_install_info, print_list, run_interactive
+
+    if args.install_info:
+        print_install_info()
+    elif args.interactive:
+        run_interactive()
+    elif args.skill:
+        print_detail(args.skill, lines=args.lines)
+    else:
+        print_list(as_json=args.json)
 
 
 # ── argparse ──────────────────────────────────────────
@@ -341,6 +440,66 @@ def main():
     p.add_argument("voice_id", help="Voice ID（如 male-qn-qingse）")
     p.add_argument("--model", default="speech-2.8-hd", help="TTS 模型")
     p.add_argument("--speed", type=float, default=1.0, help="语速 0.5-2.0")
+    p.add_argument("--vol", type=float, default=5.0, help="音量 0-10")
+
+    # official MCP server
+    sub.add_parser("mcp-server", help="启动内置官方 MiniMax MCP Server")
+
+    # speak
+    p = sub.add_parser("speak", help="官方 MCP 文本转语音")
+    p.add_argument("text", help="要转成语音的文本")
+    p.add_argument("--voice-id", default="", help="Voice ID，留空使用官方默认")
+    p.add_argument("--model", default="speech-2.8-hd", help="TTS 模型，默认 speech-2.8-hd")
+    p.add_argument("--speed", type=float, default=1.0, help="语速 0.5-2.0")
+    p.add_argument("--vol", type=float, default=5.0, help="音量 0-10")
+    p.add_argument("--output", default="", help="输出目录，默认 output/speech")
+
+    # voices
+    p = sub.add_parser("voices", help="官方 MCP 查询可用音色")
+    p.add_argument("--type", choices=["all", "system", "voice_cloning"], default="all", help="音色类型")
+
+    # voice design
+    p = sub.add_parser("voice-design", help="官方 MCP 音色设计")
+    p.add_argument("prompt", help="音色描述 prompt")
+    p.add_argument("--preview", default="你好，这是一段由 MiniMax 生成的试听音频。", help="试听文本")
+    p.add_argument("--voice-id", default="", help="指定生成的 Voice ID，留空自动生成")
+    p.add_argument("--output", default="", help="输出目录，默认 output/voices")
+
+    # voice clone
+    p = sub.add_parser("voice-clone", help="官方 MCP 音色克隆")
+    p.add_argument("voice_id", help="新 Voice ID")
+    p.add_argument("file", help="克隆用音频路径或 URL")
+    p.add_argument("--text", default="你好，这是一段由 MiniMax 生成的试听音频。", help="试听文本")
+    p.add_argument("--url", action="store_true", help="将 file 按 URL 处理")
+    p.add_argument("--output", default="", help="输出目录，默认 output/voices")
+
+    # video
+    p = sub.add_parser("video", help="官方 MCP 视频生成")
+    p.add_argument("prompt", help="视频生成 prompt")
+    p.add_argument("--model", default="", help="模型，留空使用官方默认")
+    p.add_argument("--first-frame", default="", help="首帧图片路径/URL，提供则走图生视频")
+    p.add_argument("--duration", type=int, default=None, help="时长，按模型支持填写")
+    p.add_argument("--resolution", default="", help="分辨率，如 768P 或 1080P")
+    p.add_argument("--output", default="", help="输出目录，默认 output/videos")
+    p.add_argument("--async-mode", action="store_true", help="仅提交任务，之后用 video-query 查询")
+
+    # video query
+    p = sub.add_parser("video-query", help="官方 MCP 查询视频生成任务")
+    p.add_argument("task_id", help="video --async-mode 返回的 task_id")
+    p.add_argument("--output", default="", help="输出目录，默认 output/videos")
+
+    # play audio
+    p = sub.add_parser("play-audio", help="官方 MCP 播放音频（需要 ffplay）")
+    p.add_argument("input", help="音频文件路径或 URL")
+    p.add_argument("--url", action="store_true", help="将 input 按 URL 处理")
+
+    # skills
+    p = sub.add_parser("skills", help="查看内置 MiniMax 官方 Skills 技能包")
+    p.add_argument("skill", nargs="?", help="技能名；留空则列出全部技能")
+    p.add_argument("--json", action="store_true", help="以 JSON 输出技能列表")
+    p.add_argument("--lines", type=int, default=80, help="查看技能时显示的 SKILL.md 行数")
+    p.add_argument("--interactive", action="store_true", help="打开交互式技能菜单")
+    p.add_argument("--install-info", action="store_true", help="显示接入到 Codex/Cursor 的路径说明")
 
     args = parser.parse_args()
 
@@ -354,6 +513,15 @@ def main():
             "cover": cmd_cover,
             "lyrics": cmd_lyrics,
             "tts": cmd_tts,
+            "mcp-server": cmd_mcp_server,
+            "speak": cmd_speak,
+            "voices": cmd_voices,
+            "voice-design": cmd_voice_design,
+            "voice-clone": cmd_voice_clone,
+            "video": cmd_video,
+            "video-query": cmd_video_query,
+            "play-audio": cmd_play_audio,
+            "skills": cmd_skills,
         }[args.command]
         handler(args)
     except Exception as e:

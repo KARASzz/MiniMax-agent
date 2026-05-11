@@ -45,7 +45,7 @@ if "%MINIMAX_API_KEY%"=="" (
 python --version >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo  [错误] 未检测到 Python，请先安装 Python 3.8+
+    echo  [错误] 未检测到 Python，请先安装 Python 3.10+
     echo  下载地址: https://www.python.org/downloads/
     echo.
     pause
@@ -90,12 +90,15 @@ echo  ║   6. 音乐翻唱      (Music Cover)             ║
 echo  ║   7. 歌词生成      (Lyrics Generation)       ║
 echo  ║   8. 网络搜索      (Web Search)              ║
 echo  ║   9. 图片理解      (VLM)                     ║
+echo  ║   10. 官方 MCP 扩展 (Video / Voice / Server) ║
+echo  ║   11. 官方 Skills 技能包                     ║
+echo  ║   12. 网页控制台    (Web Console)            ║
 echo  ║                                              ║
 echo  ║   0. 退出                                    ║
 echo  ║                                              ║
 echo  ╚══════════════════════════════════════════════╝
 echo.
-set /p "CHOICE=请选择功能 [0-9]: "
+set /p "CHOICE=请选择功能 [0-12]: "
 
 if "%CHOICE%"=="1" goto CHAT
 if "%CHOICE%"=="2" goto TTS
@@ -106,6 +109,9 @@ if "%CHOICE%"=="6" goto COVER
 if "%CHOICE%"=="7" goto LYRICS
 if "%CHOICE%"=="8" goto SEARCH
 if "%CHOICE%"=="9" goto VLM
+if "%CHOICE%"=="10" goto MCP
+if "%CHOICE%"=="11" goto SKILLS
+if "%CHOICE%"=="12" goto WEB
 if "%CHOICE%"=="0" goto EXIT
 
 echo 无效选择，请重新输入。
@@ -175,6 +181,92 @@ goto MENU
 :VLM
 echo.
 python vlm_image.py
+echo.
+pause
+goto MENU
+
+:MCP
+echo.
+python mcp_tools.py
+echo.
+pause
+goto MENU
+
+:SKILLS
+cls
+echo.
+echo  ╔══════════════════════════════════════════════╗
+echo  ║         MiniMax 官方 Skills 技能包           ║
+echo  ╠══════════════════════════════════════════════╣
+echo  ║   1. frontend-dev                           ║
+echo  ║   2. fullstack-dev                          ║
+echo  ║   3. android-native-dev                     ║
+echo  ║   4. ios-application-dev                    ║
+echo  ║   5. flutter-dev                            ║
+echo  ║   6. react-native-dev                       ║
+echo  ║   7. shader-dev                             ║
+echo  ║   8. gif-sticker-maker                      ║
+echo  ║   9. minimax-pdf                            ║
+echo  ║   10. pptx-generator                        ║
+echo  ║   11. minimax-xlsx                          ║
+echo  ║   12. minimax-docx                          ║
+echo  ║   13. vision-analysis                       ║
+echo  ║   14. minimax-multimodal-toolkit            ║
+echo  ║   15. minimax-music-gen                     ║
+echo  ║   16. buddy-sings                           ║
+echo  ║   17. minimax-music-playlist                ║
+echo  ║                                              ║
+echo  ║   I. 接入说明                               ║
+echo  ║   0. 返回主菜单                             ║
+echo  ╚══════════════════════════════════════════════╝
+echo.
+set /p "SKILL_CHOICE=请选择技能 [0-17/I]: "
+
+if /I "%SKILL_CHOICE%"=="I" goto SKILLS_INFO
+if "%SKILL_CHOICE%"=="1" set "SKILL_NAME=frontend-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="2" set "SKILL_NAME=fullstack-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="3" set "SKILL_NAME=android-native-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="4" set "SKILL_NAME=ios-application-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="5" set "SKILL_NAME=flutter-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="6" set "SKILL_NAME=react-native-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="7" set "SKILL_NAME=shader-dev" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="8" set "SKILL_NAME=gif-sticker-maker" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="9" set "SKILL_NAME=minimax-pdf" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="10" set "SKILL_NAME=pptx-generator" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="11" set "SKILL_NAME=minimax-xlsx" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="12" set "SKILL_NAME=minimax-docx" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="13" set "SKILL_NAME=vision-analysis" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="14" set "SKILL_NAME=minimax-multimodal-toolkit" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="15" set "SKILL_NAME=minimax-music-gen" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="16" set "SKILL_NAME=buddy-sings" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="17" set "SKILL_NAME=minimax-music-playlist" & goto SKILLS_SHOW
+if "%SKILL_CHOICE%"=="0" goto MENU
+
+echo 无效选择，请重新输入。
+timeout /t 2 >nul
+goto SKILLS
+
+:SKILLS_SHOW
+echo.
+python skills_cli.py "%SKILL_NAME%"
+echo.
+pause
+goto SKILLS
+
+:SKILLS_INFO
+echo.
+python skills_cli.py --install-info
+echo.
+pause
+goto SKILLS
+
+:WEB
+echo.
+echo 网页控制台启动后将自动打开 http://127.0.0.1:7860
+echo 按 Ctrl+C 可停止服务。
+echo.
+start "" "http://127.0.0.1:7860"
+python web_app.py
 echo.
 pause
 goto MENU

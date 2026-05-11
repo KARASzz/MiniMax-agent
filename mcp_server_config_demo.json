@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "MiniMax": {
+      "command": "python",
+      "args": [
+        "D:\\你的路径\\MiniMax-agent\\mcp_server.py"
+      ],
+      "env": {
+        "MINIMAX_API_HOST": "https://api.minimax.chat",
+        "MINIMAX_MCP_BASE_PATH": "D:\\你的路径\\MiniMax-agent\\output",
+        "MINIMAX_API_RESOURCE_MODE": "local"
+      }
+    }
+  }
+}
