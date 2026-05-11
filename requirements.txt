@@ -3,4 +3,5 @@ httpx
 fastapi
 python-multipart
 uvicorn
+jinja2
 -e ./MiniMax-MCP
