@@ -13,7 +13,7 @@
 | 5 | 音乐生成 | `music_gen.py` | 根据描述生成音乐，支持纯音乐/带歌词 |
 | 6 | 音乐翻唱 | `music_gen.py` | 将已有音频翻唱为指定风格 |
 | 7 | 歌词生成 | `lyrics_gen.py` | AI 创作歌词，支持全新创作和编辑模式 |
-| 8 | 网络搜索 | `web_search.py` | 基于 Token Plan. 的网络搜索 |
+| 8 | 网络搜索 | `web_search.py` | 基于 Token Plan 的网络搜索 |
 | 9 | 图片理解 | `vlm_image.py` | VLM 视觉模型分析图片内容 |
 | 10 | 官方 MCP Server | `mcp_server.py` / `MiniMax-MCP/` | 保留并复用官方 MCP 服务器目录 |
 | 11 | 视频生成 | `mcp_tools.py` | 调用官方 MCP `generate_video` |
