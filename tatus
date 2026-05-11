@@ -1,0 +1,17 @@
+[33mcommit bfbd2e508281ba4d6226231866fb9564ceedd21a[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: KARASzz <zyheffie@hotmail.com>
+Date:   Mon May 11 21:51:13 2026 +0800
+
+    security: remove env file
+
+[33mcommit 44816f801d5f08a790b59e752ed9609fb499932a[m
+Author: KARASzz <zyheffie@hotmail.com>
+Date:   Mon May 11 21:08:44 2026 +0800
+
+    feat: update Python version requirement and enhance functionality in MiniMax tools
+    
+    - Changed the minimum required Python version from 3.8 to 3.10 in the batch script.
+    - Expanded the main menu options to include new functionalities (MCP, Skills, Web Console).
+    - Added a new command script for Unix-like systems to manage environment variables and dependencies.
+    - Implemented a skills menu with various options for MiniMax skills.
+    - Improved error handling and user prompts for better user experience.
