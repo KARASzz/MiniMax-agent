@@ -29,6 +29,7 @@ read_env_var_from_file() {
     line="${line#"${line%%[![:space:]]*}"}"
     [[ -z "$line" || "$line" == \#* ]] && continue
     line="${line#export }"
+    [[ "$line" == *"="* ]] || continue
     key="${line%%=*}"
     key="$(trim_value "$key")"
     [[ "$key" == "$var_name" ]] || continue
@@ -63,12 +64,6 @@ load_saved_environment() {
   done
 }
 
-load_saved_environment
-
-if [[ -z "${MINIMAX_MCP_API_HOST:-}" ]]; then
-  export MINIMAX_MCP_API_HOST="https://api.minimax.chat"
-fi
-
 pause() {
   echo
   read -r -p "按回车继续..."
@@ -76,7 +71,15 @@ pause() {
 
 find_python() {
   if [[ -x "$VENV_DIR/bin/python" ]]; then
-    echo "$VENV_DIR/bin/python"
+    printf '%s\n' "$VENV_DIR/bin/python"
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    command -v python3
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    command -v python
     return 0
   fi
   return 1
@@ -88,13 +91,14 @@ ensure_api_key() {
   fi
 
   clear
-  echo
-  echo "╔═══════════════════════════════════════════════════════╗"
-  echo "║  未检测到环境变量 MINIMAX_API_KEY                    ║"
-  echo "╚═══════════════════════════════════════════════════════╝"
-  echo
-  echo "请输入你的 MiniMax API 密钥："
-  echo "https://platform.minimaxi.com/user-center/basic-information/interface-key"
+  cat <<'EOF'
+╔════════════════════════════════════════════════════════════╗
+║              未检测到环境变量 MINIMAX_API_KEY             ║
+╚════════════════════════════════════════════════════════════╝
+
+请输入你的 MiniMax API 密钥:
+https://platform.minimaxi.com/user-center/basic-information/interface-key
+EOF
   echo
   read -r -s -p "API Key: " API_KEY
   echo
@@ -106,7 +110,7 @@ ensure_api_key() {
 
   export MINIMAX_API_KEY="$API_KEY"
   echo
-  read -r -p "是否写入项目 .env，供双击启动器以后自动读取？[Y/n]: " SAVE_KEY
+  read -r -p "是否写入项目 .env，供以后双击启动器自动读取？[Y/n]: " SAVE_KEY
   if [[ ! "$SAVE_KEY" =~ ^[Nn]$ ]]; then
     {
       echo
@@ -125,17 +129,16 @@ ensure_python() {
   PYTHON_BIN="$(find_python || true)"
   if [[ -z "${PYTHON_BIN:-}" ]]; then
     echo
-    echo "[错误] 未检测到项目虚拟环境 Python。"
-    echo "期望路径: $VENV_DIR/bin/python"
-    echo
-    echo "请先在项目目录创建虚拟环境并安装依赖："
-    echo "  python3 -m venv .venv"
-    echo "  .venv/bin/python -m pip install -r requirements.txt"
+    echo "[错误] 未检测到 Python，请先安装 Python 3.10+"
+    echo "下载地址: https://www.python.org/downloads/"
     pause
     exit 1
   fi
-  export VIRTUAL_ENV="$VENV_DIR"
-  export PATH="$VENV_DIR/bin:$PATH"
+
+  if [[ "$PYTHON_BIN" == "$VENV_DIR/bin/python" ]]; then
+    export VIRTUAL_ENV="$VENV_DIR"
+    export PATH="$VENV_DIR/bin:$PATH"
+  fi
 
   if ! "$PYTHON_BIN" - <<'PY' >/dev/null 2>&1
 import sys
@@ -151,12 +154,19 @@ PY
 }
 
 ensure_deps() {
-  if [[ -f ".deps_installed" ]]; then
+  if "$PYTHON_BIN" - <<'PY' >/dev/null 2>&1
+import fastapi
+import uvicorn
+import httpx
+import multipart
+PY
+  then
+    [[ -f ".deps_installed" ]] || : > ".deps_installed"
     return 0
   fi
 
   echo
-  echo "首次运行，正在安装依赖..."
+  echo "检测到依赖缺失，正在安装 requirements.txt..."
   echo
   if ! "$PYTHON_BIN" -m pip install -r requirements.txt; then
     echo
@@ -166,58 +176,165 @@ ensure_deps() {
   fi
   : > ".deps_installed"
   echo
-  echo "依赖安装完成。"
+  echo "依赖安装完成！"
+  pause
+}
+
+open_url() {
+  local url="$1"
+  if command -v open >/dev/null 2>&1; then
+    open "$url" >/dev/null 2>&1
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$url" >/dev/null 2>&1
+  fi
+}
+
+end_action() {
+  local code="$1"
+  echo
+  echo "---------------------------------------"
+  if [[ "$code" == "0" ]]; then
+    echo "[任务处理完成]"
+  else
+    echo "[任务执行异常] 退出码: $code"
+  fi
   pause
 }
 
 run_python() {
   echo
   "$PYTHON_BIN" "$@"
-  pause
+  end_action "$?"
 }
 
 run_web_console() {
   echo
-  echo "网页控制台启动后将自动打开 http://127.0.0.1:7860"
+  echo "🌐 网页控制台启动后将自动打开 http://127.0.0.1:7860"
   echo "按 Ctrl+C 可停止服务。"
   echo
-  (sleep 1.5; open "http://127.0.0.1:7860" >/dev/null 2>&1) &
+  (sleep 1.5; open_url "http://127.0.0.1:7860") &
   "$PYTHON_BIN" web_app.py
-  pause
+  end_action "$?"
+}
+
+show_header() {
+  clear
+  cat <<'EOF'
+╔════════════════════════════════════════════════════════════╗
+║ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧ ❈ ✦ ❈ ✧ ❈  ║
+║ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧ ❈ ✦ ❈ ✧ ❈  ║
+║                                                            ║
+║        ██╗  ██╗  ████╗  █████╗    ████╗  ███████╗          ║
+║        ██║ ██╔╝ ██╔═██╗ ██╔═██╗  ██╔═██╗ ██╔════╝          ║
+║        █████╔╝  ██████║ █████╔╝  ██████║ ███████╗          ║
+║        ██╔═██╗  ██╔═██║ ██╔═██╗  ██╔═██╗ ╚════██║          ║
+║        ██║  ██╗ ██║ ██║ ██║  ██║ ██║ ██║ ███████║          ║
+║        ╚═╝  ╚═╝ ╚═╝ ╚═╝ ╚═╝  ╚═╝ ╚═╝ ╚═╝ ╚══════╝          ║
+║                                                            ║
+║ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧ ❈  ║
+║ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❉ ✧ ❈ ✦ ❈ ✧ ❈  ║
+╠════════════════════════════════════════════════════════════╣
+║                ⚛️⚛️【MiniMax Agent】⚛️⚛️                   ║
+╠════════════════════════════════════════════════════════════╣
+║                   🐉 多模态控制台 V1.0 🐉                  ║
+╚════════════════════════════════════════════════════════════╝
+EOF
+}
+
+show_main_menu() {
+  while true; do
+    show_header
+    cat <<'EOF'
+
+╔══════════【 核心功能 】══════════╗
+║                                  ║
+║  [1] 🧠 文本对话     (AI Chat)   ║
+║  [2] 🎙️ 小说转语音   (TTS)       ║
+║  [3] 🎨 文生图       (T2I)       ║
+║  [4] 🖼️ 图生图       (I2I)       ║
+║                                  ║
+╠══════════【 音乐与创作 】════════╣
+║                                  ║
+║  [5] 🎵 音乐生成     (Music)     ║
+║  [6] 🎤 音乐翻唱     (Cover)     ║
+║  [7] ✍️ 歌词生成     (Lyrics)    ║
+║                                  ║
+╠══════════【 工具与扩展 】════════╣
+║                                  ║
+║  [8] 🔎 网络搜索     (Search)    ║
+║  [9] 👁️ 图片理解     (VLM)       ║
+║  [10] 🧩 官方 MCP 扩展           ║
+║  [11] 🧰 官方 Skills 技能包      ║
+║  [12] 🌐 网页控制台              ║
+║                                  ║
+╠══════════【 系统控制 】══════════╣
+║                                  ║
+║  [0] 🚪 退出程序     (Exit)      ║
+║                                  ║
+╚══════════════════════════════════╝
+
+EOF
+    read -r -p "请输入编号并回车: " opt
+
+    case "$opt" in
+      1) run_python text_chat.py ;;
+      2) run_python tts_novel.py ;;
+      3) run_python image_gen.py t2i ;;
+      4) run_python image_gen.py i2i ;;
+      5) run_python music_gen.py gen ;;
+      6) run_python music_gen.py cover ;;
+      7) run_python lyrics_gen.py ;;
+      8) run_python web_search.py ;;
+      9) run_python vlm_image.py ;;
+      10) run_python mcp_tools.py ;;
+      11) show_skills_menu ;;
+      12) run_web_console ;;
+      0)
+        echo
+        echo "感谢使用 MiniMax 专用小工具！"
+        exit 0
+        ;;
+      *)
+        echo "⚠️ 输入错误，请重新选择 (0-12)"
+        sleep 1
+        ;;
+    esac
+  done
 }
 
 show_skills_menu() {
   while true; do
     clear
-    echo
-    echo "╔══════════════════════════════════════════════╗"
-    echo "║         MiniMax 官方 Skills 技能包           ║"
-    echo "╠══════════════════════════════════════════════╣"
-    echo "║   1. frontend-dev                           ║"
-    echo "║   2. fullstack-dev                          ║"
-    echo "║   3. android-native-dev                     ║"
-    echo "║   4. ios-application-dev                    ║"
-    echo "║   5. flutter-dev                            ║"
-    echo "║   6. react-native-dev                       ║"
-    echo "║   7. shader-dev                             ║"
-    echo "║   8. gif-sticker-maker                      ║"
-    echo "║   9. minimax-pdf                            ║"
-    echo "║   10. pptx-generator                        ║"
-    echo "║   11. minimax-xlsx                          ║"
-    echo "║   12. minimax-docx                          ║"
-    echo "║   13. vision-analysis                       ║"
-    echo "║   14. minimax-multimodal-toolkit            ║"
-    echo "║   15. minimax-music-gen                     ║"
-    echo "║   16. buddy-sings                           ║"
-    echo "║   17. minimax-music-playlist                ║"
-    echo "║                                              ║"
-    echo "║   I. 接入说明                               ║"
-    echo "║   0. 返回主菜单                             ║"
-    echo "╚══════════════════════════════════════════════╝"
-    echo
-    read -r -p "请选择技能 [0-17/I]: " SKILL_CHOICE
+    cat <<'EOF'
+╔══════════【 MiniMax 官方 Skills 技能包 】══════════╗
+║                                                    ║
+║  [1]  frontend-dev                                ║
+║  [2]  fullstack-dev                               ║
+║  [3]  android-native-dev                          ║
+║  [4]  ios-application-dev                         ║
+║  [5]  flutter-dev                                 ║
+║  [6]  react-native-dev                            ║
+║  [7]  shader-dev                                  ║
+║  [8]  gif-sticker-maker                           ║
+║  [9]  minimax-pdf                                 ║
+║  [10] pptx-generator                              ║
+║  [11] minimax-xlsx                                ║
+║  [12] minimax-docx                                ║
+║  [13] vision-analysis                             ║
+║  [14] minimax-multimodal-toolkit                  ║
+║  [15] minimax-music-gen                           ║
+║  [16] buddy-sings                                 ║
+║  [17] minimax-music-playlist                      ║
+║                                                    ║
+║  [I]  接入说明                                    ║
+║  [0]  返回主菜单                                  ║
+║                                                    ║
+╚════════════════════════════════════════════════════╝
 
-    case "$SKILL_CHOICE" in
+EOF
+    read -r -p "请输入编号并回车: " skill_opt
+
+    case "$skill_opt" in
       [Ii]) run_python skills_cli.py --install-info ;;
       1) run_python skills_cli.py frontend-dev ;;
       2) run_python skills_cli.py fullstack-dev ;;
@@ -237,60 +354,19 @@ show_skills_menu() {
       16) run_python skills_cli.py buddy-sings ;;
       17) run_python skills_cli.py minimax-music-playlist ;;
       0) return 0 ;;
-      *) echo "无效选择，请重新输入。"; sleep 1 ;;
-    esac
-  done
-}
-
-show_main_menu() {
-  while true; do
-    clear
-    echo
-    echo "╔══════════════════════════════════════════════╗"
-    echo "║         MiniMax 专用小工具 v1.0              ║"
-    echo "╠══════════════════════════════════════════════╣"
-    echo "║                                              ║"
-    echo "║   1. 文本对话      (AI Chat)                 ║"
-    echo "║   2. 小说转语音    (Novel → Audio)           ║"
-    echo "║   3. 文生图        (Text → Image)            ║"
-    echo "║   4. 图生图        (Image → Image)           ║"
-    echo "║   5. 音乐生成      (Music Generation)        ║"
-    echo "║   6. 音乐翻唱      (Music Cover)             ║"
-    echo "║   7. 歌词生成      (Lyrics Generation)       ║"
-    echo "║   8. 网络搜索      (Web Search)              ║"
-    echo "║   9. 图片理解      (VLM)                     ║"
-    echo "║   10. 官方 MCP 扩展 (Video / Voice / Server) ║"
-    echo "║   11. 官方 Skills 技能包                     ║"
-    echo "║   12. 网页控制台    (Web Console)            ║"
-    echo "║                                              ║"
-    echo "║   0. 退出                                    ║"
-    echo "║                                              ║"
-    echo "╚══════════════════════════════════════════════╝"
-    echo
-    read -r -p "请选择功能 [0-12]: " CHOICE
-
-    case "$CHOICE" in
-      1) run_python text_chat.py ;;
-      2) run_python tts_novel.py ;;
-      3) run_python image_gen.py t2i ;;
-      4) run_python image_gen.py i2i ;;
-      5) run_python music_gen.py gen ;;
-      6) run_python music_gen.py cover ;;
-      7) run_python lyrics_gen.py ;;
-      8) run_python web_search.py ;;
-      9) run_python vlm_image.py ;;
-      10) run_python mcp_tools.py ;;
-      11) show_skills_menu ;;
-      12) run_web_console ;;
-      0)
-        echo
-        echo "感谢使用 MiniMax 专用小工具。"
-        exit 0
+      *)
+        echo "⚠️ 输入错误，请重新选择 (0-17/I)"
+        sleep 1
         ;;
-      *) echo "无效选择，请重新输入。"; sleep 1 ;;
     esac
   done
 }
+
+load_saved_environment
+
+if [[ -z "${MINIMAX_MCP_API_HOST:-}" ]]; then
+  export MINIMAX_MCP_API_HOST="https://api.minimax.chat"
+fi
 
 ensure_api_key
 ensure_python
